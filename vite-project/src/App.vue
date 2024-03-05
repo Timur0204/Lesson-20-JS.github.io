@@ -1,108 +1,123 @@
+
 <script setup>
+import { reactive, ref, onMounted, computed, watch } from 'vue';
+import Card from './components/Card.vue';
 
-  const url = 'https://fakestoreapi.com/products';
+const url = 'https://fakestoreapi.com/products';
+const products = reactive([]);
+const search = ref('');
+const sort = ref('');
+const min = ref(0);
+const max = ref(1000);
 
-  import { reactive, ref, onMounted, computed } from 'vue';
+onMounted(async () => {
+  let data = await fetch(url);
+  data = await data.json();
+  for (let item of data) {
+    item.quantity = localStorage.getItem(`quantity-${item.id}`) || 0;
+  }
+  products.push(...data);
+});
 
-  import Card from './components/Card.vue';
+const totalQuantity = computed(() => products.reduce((acc, item) => acc + parseInt(item.quantity), 0));
+const totalCost = computed(() => products.reduce((acc, item) => acc + item.quantity * item.price, 0));
 
-  const products = reactive([]);
+const productsToShow = computed(() => {
+  let s = search.value.toLowerCase();
+  let results = products.filter(item =>
+    item.title.toLowerCase().includes(s) || item.description.toLowerCase().includes(s)
+  );
 
-  onMounted(async () => {
-    let data = await fetch(url);
-        data = await data.json();
-    for(let item of data){
-      item.quantity = 0;
-    }
-    console.log(data);
-    products.push(...data);
-  });
+  results = results.filter(item => item.price >= min.value && item.price <= max.value);
 
-  const search = ref('');
-
-  const sort = ref('');
-
-  const min = ref(0);
-
-  const max = ref(1000);
-
-  const totalQuantity = computed(() => products.reduce((acc, item) => acc + item.quantity, 0));
-  const totalCost = computed(() => products.reduce((acc, item) => acc + item.quantity * item.price, 0));
-
-  const productsToShow = computed(() => {
-    let s = search.value.toLowerCase();
-    let results = products.filter(item =>
-      item.title.toLowerCase().includes(s) ||
-      item.description.toLowerCase().includes(s)
-    );
-
-    results = results.filter(item => item.price >= min.value && item.price <= max.value);
-
-    if(sort.value == 'up'){
-      results.sort((a,b) => a.price - b.price);
-    } else if(sort.value == 'down'){
-      results.sort((a,b) => b.price - a.price);
-    }
-
-    return results;
-  });
-
-  const qtUp = (product) => {
-    product.quantity++;
+  if (sort.value == 'up') {
+    results.sort((a, b) => a.price - b.price);
+  } else if (sort.value == 'down') {
+    results.sort((a, b) => b.price - a.price);
   }
 
-  const qtDown = (product) => {
-    if(product.quantity > 0){
-      product.quantity--;
-    }
-  }
+  return results;
+});
 
+const qtUp = (product) => {
+  product.quantity++;
+  localStorage.setItem(`quantity-${product.id}`, product.quantity);
+}
+
+const qtDown = (product) => {
+  if (product.quantity > 0) {
+    product.quantity--;
+    localStorage.setItem(`quantity-${product.id}`, product.quantity);
+  }
+}
+
+const saveFilter = () => {
+  localStorage.setItem('minPrice', min.value);
+  localStorage.setItem('maxPrice', max.value);
+  localStorage.setItem('sort', sort.value);
+}
+
+const loadFilter = () => {
+  min.value = localStorage.getItem('minPrice');
+  max.value = localStorage.getItem('maxPrice');
+  sort.value = localStorage.getItem('sort');
+}
+
+onMounted(() => {
+  loadFilter();
+});
+
+watch([min, max, sort], () => {
+  saveFilter();
+});
 </script>
+
+
 
 <template>
   <div class="container">
-          <header class="mb-3 pb-2">
-            <h1>Product</h1>
+    <header class="mb-3 pb-2">
+      <h1>Product</h1>
 
-            <div class='text-right'>
-                <input id='search' class='me-auto' type="text" placeholder="Search..." v-model="search">
+      <div class='text-right'>
+        <input id='search' class='me-auto' type="text" placeholder="Search..." v-model="search">
 
-                <div class="title">
-                    <h2 class="h2">Options</h2>
-                </div>
-                <div class="range d-flex flex-column">
-                    <input min="0" max="1000" type="range" id="minPrice" v-model="min">
-                    <span>Min: {{ min }}$</span>
-                    <input min="0" max="1000" type="range" id="maxPrice" v-model="max">
-                    <span>Max: {{ max }}$</span>
-                </div>                              
-                
-
-                <span class='mx-4 d-flex align-items-center'>
-                    <label for='sort-up'>Price Up</label>
-                    <input id='sort-up' class='mx-2' type="radio" value='up' name='sort' v-model="sort">
-                </span>
-
-                <span class='mx-4 d-flex align-items-center'>
-                    <label for='sort-down'>Price Down</label>
-                    <input id='sort-down' class='mx-2' type="radio" value='down' name='sort' v-model="sort">
-                </span>
-            </div>
-
-            <h4 class="mb-0">
-                <span class="px-2">Количество: ({{ totalQuantity }})</span>
-                <span>Общая стоимость: ${{ totalCost.toFixed(2) }}</span>
-              </h4>
-        </header>
-    <main>
-        <div class="row row-cols-4">
-            <Card
-              v-for="item in productsToShow"
-              :product="item"
-              @quantity-up="qtUp"
-              @quantity-down="qtDown"
-            />
+        <div class="title">
+          <h2 class="h2">Options</h2>
         </div>
+        <div class="range d-flex flex-column">
+          <input min="0" max="1000" type="range" id="minPrice" v-model="min">
+          <span>Min: {{ min }}$</span>
+          <input min="0" max="1000" type="range" id="maxPrice" v-model="max">
+          <span>Max: {{ max }}$</span>
+        </div>
+
+        <span class='mx-4 d-flex align-items-center'>
+          <label for='sort-up'>Price Up</label>
+          <input id='sort-up' class='mx-2' type="radio" value='up' name='sort' v-model="sort">
+        </span>
+
+        <span class='mx-4 d-flex align-items-center'>
+          <label for='sort-down'>Price Down</label>
+          <input id='sort-down' class='mx-2' type="radio" value='down' name='sort' v-model="sort">
+        </span>
+      </div>
+
+      <h4 class="mb-0">
+        <span class="px-2">Количество: ({{ totalQuantity }})</span>
+        <span>Общая стоимость: ${{ totalCost.toFixed(2) }}</span>
+      </h4>
+    </header>
+    <main>
+      <div class="row row-cols-4">
+        <Card
+          v-for="item in productsToShow"
+          :key="item.id"
+          :product="item"
+          @quantity-up="qtUp"
+          @quantity-down="qtDown"
+        />
+      </div>
     </main>
   </div>
 </template>
