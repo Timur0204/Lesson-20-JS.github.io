@@ -1,5 +1,6 @@
 
 <script setup>
+
 import { reactive, ref, onMounted, computed, watch } from 'vue';
 import Card from './components/Card.vue';
 
@@ -70,8 +71,8 @@ onMounted(() => {
 watch([min, max, sort], () => {
   saveFilter();
 });
-</script>
 
+</script>
 
 
 <template>
